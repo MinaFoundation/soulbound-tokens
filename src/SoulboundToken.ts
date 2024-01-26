@@ -16,11 +16,26 @@ class TokenState extends Struct({
     }
 }
 
+/**  Implementation of soulbound tokens
+ * 
+ * This contract can issue tokens. Each token is uniquely described by its
+ * `SoulboundMetadata` (which includes the `PubKey` that holds a given token).
+ * 
+ * We store the tokens in a `MerkleMap`, where the key is the hash of the
+ * metadata, and the value is the current state of the token (it can be
+ * issued, revoked, or nonexistent).
+ * 
+ * The `MerkleMap` is stored off-chain, but we keep its root on-chain as
+ * part of the contract state.
+ * 
+*/
 class SoulboundToken
  extends SmartContract {
     @state(Field) root = State<Field>();
-
     tokenMap: OffchainMerkleMap;
+
+    // In this example, all tokens from this contract can be
+    // revoked according to the same policy
     revocationPolicy: RevocationPolicy;
 
     @method init(): void {
@@ -48,6 +63,7 @@ class SoulboundToken
         const key = metadata.hash();
         signature.verify(metadata.holderKey, SoulboundMetadata.toFields(metadata));
         const currentState = await this.tokenMap.get(key);
+        // Note that `MerkleMap.get` returns `Field(0)` for noexistent entries.
         currentState.assertEquals(TokenState.types.nonexistent)
         // Include the new token in the off-chain map, and update
         // the on-chain Merkle root
