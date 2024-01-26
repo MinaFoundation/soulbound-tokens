@@ -61,7 +61,7 @@ class SoulboundToken
         metadata.revocationPolicy.type.assertEquals(this.revocationPolicy.type);
         // Check that the token has not been issued before
         const key = metadata.hash();
-        signature.verify(metadata.holderKey, SoulboundMetadata.toFields(metadata));
+        signature.verify(metadata.holderKey, SoulboundMetadata.toFields(metadata)).assertEquals(Bool(true));
         const currentState = await this.tokenMap.get(key);
         // Note that `MerkleMap.get` returns `Field(0)` for noexistent entries.
         currentState.assertEquals(TokenState.types.nonexistent)
