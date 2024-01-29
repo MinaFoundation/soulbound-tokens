@@ -10,7 +10,7 @@ import { OffchainMerkleMap } from "./OffchainMerkleMap";
 class MemoryMerkleMap implements OffchainMerkleMap {
     myMap: MerkleMap
 
-    constructor(height: number) {
+    constructor() {
         this.myMap = new MerkleMap()
     }
 

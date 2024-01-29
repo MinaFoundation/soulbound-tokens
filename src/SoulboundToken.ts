@@ -31,12 +31,13 @@ class TokenState extends Struct({
 */
 class SoulboundToken
  extends SmartContract {
+    // Root of tyhe `MerkleMap` that contains all the tokens
     @state(Field) root = State<Field>();
-    tokenMap: OffchainMerkleMap;
-
     // In this example, all tokens from this contract can be
     // revoked according to the same policy
-    revocationPolicy: RevocationPolicy;
+    @state(RevocationPolicy) revocationPolicy = State<RevocationPolicy>();
+    tokenMap: OffchainMerkleMap;
+
 
     @method init(): void {
         super.init();
@@ -44,9 +45,9 @@ class SoulboundToken
         this.root.set(emptyMap.getRoot());
     }
 
-    @method public initialise(tokenMap: OffchainMerkleMap, revocationPolicy: RevocationPolicy): void {
+    public initialise(tokenMap: OffchainMerkleMap, revocationPolicy: RevocationPolicy): void {
         this.tokenMap = tokenMap;
-        this.revocationPolicy = revocationPolicy;
+        this.revocationPolicy.set(revocationPolicy);
     }
 
     /** Assert integrity of the off-chain MerkleMap */

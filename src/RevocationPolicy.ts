@@ -9,13 +9,13 @@ class RevocationPolicy extends Struct ({
 }) {
     public static types = {
         // the issuer has the right to revoke tokens
-        issuerOnly: 0,
+        issuerOnly: Field(0),
         // only the holder of the token can revoke it
-        holderOnly: 1,
+        holderOnly: Field(1),
         // a token can only be revoked if issuer and holder agree
-        both: 2,
+        both: Field(2),
         // tokens are indestructible
-        neither: 3,
+        neither: Field(3),
     };
 }
 
