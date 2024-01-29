@@ -31,7 +31,7 @@ class TokenState extends Struct({
 */
 class SoulboundToken
  extends SmartContract {
-    // Root of tyhe `MerkleMap` that contains all the tokens
+    // Root of the `MerkleMap` that contains all the tokens
     @state(Field) root = State<Field>();
     // In this example, all tokens from this contract can be
     // revoked according to the same policy

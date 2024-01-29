@@ -19,5 +19,5 @@
     "noFallthroughCasesInSwitch": true,
     "allowSyntheticDefaultImports": true
   },
-  "include": ["./src"]
+  "include": ["./src", "test/Add.test.ts", "test/SoulboundToken.test.ts"]
 }

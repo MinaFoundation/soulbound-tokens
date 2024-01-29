@@ -1,9 +1,9 @@
 import { AccountUpdate, Field, Mina, Poseidon, PrivateKey, PublicKey, Signature, UInt32 } from "o1js";
-import { SoulboundToken } from "./SoulboundToken";
-import { MemoryMerkleMap } from "./OffchainMerkleMap/MemoryMerkleMap";
-import { RevocationPolicy } from "./RevocationPolicy";
+import { SoulboundToken } from "../src/SoulboundToken";
+import { MemoryMerkleMap } from "../src/OffchainMerkleMap/MemoryMerkleMap";
+import { RevocationPolicy } from "../src/RevocationPolicy";
 import { sendTransaction } from "o1js/dist/node/lib/mina";
-import { SoulboundMetadata } from "./SoulboundMetadata";
+import { SoulboundMetadata } from "../src/SoulboundMetadata";
 
 const accountCreationFee = 0;
 const proofsEnabled = false;
