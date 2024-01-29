@@ -1,8 +1,6 @@
-import { AccountUpdate, Field, Mina, Poseidon, PrivateKey, PublicKey, Signature, UInt32 } from "o1js";
+import { Field, MerkleMap, Mina, PrivateKey, PublicKey, Signature, UInt32 } from "o1js";
 import { SoulboundToken } from "../src/SoulboundToken";
-import { MemoryMerkleMap } from "../src/OffchainMerkleMap/MemoryMerkleMap";
 import { RevocationPolicy } from "../src/RevocationPolicy";
-import { sendTransaction } from "o1js/dist/node/lib/mina";
 import { SoulboundMetadata } from "../src/SoulboundMetadata";
 
 const accountCreationFee = 0;
@@ -21,7 +19,7 @@ describe('SoulboundToken', () => {
     issuerKey: PrivateKey,
     issuer: SoulboundToken,
 
-    tokenMap: MemoryMerkleMap;
+    tokenMap: MerkleMap;
 
   beforeAll(async () => {
     if (proofsEnabled) await SoulboundToken.compile();
@@ -35,14 +33,16 @@ describe('SoulboundToken', () => {
     issuerKey = PrivateKey.random();
     issuerAddress = issuerKey.toPublicKey();
     issuer = new SoulboundToken(issuerAddress);
-    tokenMap = new MemoryMerkleMap();
+    tokenMap = new MerkleMap();
   })
 
   async function localDeploy() {
     const tx = await Mina.transaction(deployerAccount, () => {
-      issuer.initialise(tokenMap, revocationPolicy)
+      issuer.initialise(revocationPolicy)
       issuer.deploy();
-    })
+    });
+    await tx.prove();
+    await tx.sign([deployerKey, issuerKey]).send();
   }
 
   describe('SoulboundToken', () => {
@@ -61,7 +61,9 @@ describe('SoulboundToken', () => {
           attributes: [Field(0)]
         });
         const signature = Signature.create(holderKey, SoulboundMetadata.toFields(metadata));
-        issuer.issueToken(metadata, signature);
+        const key = metadata.hash()
+        const witness = tokenMap.getWitness(key)
+        issuer.issue(metadata, signature, witness);
       });
       await tx.prove();
       await tx.sign([holderKey]).send();
