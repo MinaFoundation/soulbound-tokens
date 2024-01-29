@@ -1,6 +1,6 @@
 import {
     Field,
-    SmartContract, state, State, method, Signature, Struct, MerkleMap,
+    SmartContract, state, State, method, Signature, Struct, MerkleMap, PublicKey, Bool,
 } from 'o1js';
 import { RevocationPolicy } from './RevocationPolicy';
 import { OffchainMerkleMap } from './OffchainMerkleMap/OffchainMerkleMap';
@@ -49,10 +49,21 @@ class SoulboundToken
         this.revocationPolicy = revocationPolicy;
     }
 
-    @method async issueToken(metadata: SoulboundMetadata, signature: Signature) {
+    /** Assert integrity of the off-chain MerkleMap */
+    async rootCheck(): Promise<void> {
+        const root = await this.tokenMap.getRoot();
+        this.root.requireEquals(root);
+    }
+
+    /** Issue a token
+     *
+     * @argument metadata: The @link SoulboundMetadata of the token to be issued
+     * @param signature: A signature for the metadata, from the future token holder
+     * 
+     */
+    @method public async issueToken(metadata: SoulboundMetadata, signature: Signature): Promise<void> {
         // Check that the on-chain root matches the off-chain one
-        const oldRoot = await this.tokenMap.getRoot()
-        this.root.requireEquals(oldRoot);
+        await this.rootCheck();
         // Check that we are in the time window that the token
         // can be issued
         const [lower, upper] = metadata.issuedBetween;
@@ -67,11 +78,43 @@ class SoulboundToken
         currentState.assertEquals(TokenState.types.nonexistent)
         // Include the new token in the off-chain map, and update
         // the on-chain Merkle root
-        const newRoot = await this.tokenMap.setAndGetNewRoot(
+
+        // TODO: Add custom business logic here if you do not want
+        // to issue issue tokens unconditionally
+
+        const root = await this.tokenMap.setAndGetNewRoot(
             key, 
             TokenState.types.issued
-            )
-        this.root.set(newRoot);
+            );
+        this.root.set(root);
+    }
+
+    /** Revoke an existing token
+     *
+     * This does not yet check the `RevocationPolicy` of the token.
+     */
+    @method public async revoke(metadata: SoulboundMetadata): Promise<void> {
+        await this.rootCheck();
+        const key = metadata.hash();
+        const currentState = await this.tokenMap.get(key);
+        currentState.assertEquals(TokenState.types.issued);
+        const policyType = metadata.revocationPolicy.type;
+        // TODO: check revocation policy
+        const root = await this.tokenMap.setAndGetNewRoot(
+            key,
+            TokenState.types.revoked
+        );
+        this.root.set(root);
+    }
+
+    /** Verify that a token exists and is not revoked */
+    @method public async verify(metadata: SoulboundMetadata): Promise<void> {
+        await this.rootCheck();
+        const key = metadata.hash();
+        const currentState = await this.tokenMap.get(key);
+        //note: we could require a signature from the owner,
+        // if we do not want anyone to be able to validate
+        currentState.assertEquals(TokenState.types.issued);
     }
 }
 
