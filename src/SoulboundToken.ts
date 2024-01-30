@@ -4,6 +4,7 @@ import {
 } from 'o1js';
 import { RevocationPolicy } from './RevocationPolicy';
 import { SoulboundMetadata } from './SoulboundMetadata';
+import { SoulboundErrors } from './SoulboundErrors';
 
 class TokenState extends Struct({
     issueState: Field
@@ -70,7 +71,11 @@ class SoulboundToken
         this.currentSlot.requireBetween(lower, upper);
 
         // Check that the `RevocationPolicy` has the right value
-        metadata.revocationPolicy.type.assertEquals(this.revocationPolicy.get().type);
+        metadata.revocationPolicy.type
+          .assertEquals(
+            this.revocationPolicy.get().type,
+            SoulboundErrors.wrongPolicy
+            );
 
         // Check signature of holder
         signature.verify(metadata.holderKey, SoulboundMetadata.toFields(metadata)).assertEquals(Bool(true));
@@ -115,8 +120,8 @@ class SoulboundToken
 
         const expectedKey = metadata.hash();
         const [root, key] = witness.computeRootAndKey(TokenState.types.issued)
-        this.root.requireEquals(root);
-        expectedKey.assertEquals(key);
+        root.assertEquals(this.root.get(), SoulboundErrors.invalidToken);
+        expectedKey.assertEquals(key, SoulboundErrors.invalidToken);
     }
 }
 
