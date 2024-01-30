@@ -2,6 +2,7 @@ import { Field, MerkleMap, Mina, PrivateKey, PublicKey, Signature, UInt32 } from
 import { SoulboundToken } from "../src/SoulboundToken";
 import { RevocationPolicy } from "../src/RevocationPolicy";
 import { SoulboundMetadata } from "../src/SoulboundMetadata";
+import { SoulboundTokenDriver } from "./SoulboundTokenDriver";
 
 const accountCreationFee = 0;
 const proofsEnabled = false;
@@ -18,6 +19,7 @@ describe('SoulboundToken', () => {
     issuerAddress: PublicKey,
     issuerKey: PrivateKey,
     issuer: SoulboundToken,
+    driver: SoulboundTokenDriver,
 
     tokenMap: MerkleMap;
 
@@ -34,26 +36,23 @@ describe('SoulboundToken', () => {
     issuerAddress = issuerKey.toPublicKey();
     issuer = new SoulboundToken(issuerAddress);
     tokenMap = new MerkleMap();
+    driver = new SoulboundTokenDriver(
+      tokenMap,
+      issuer,
+      issuerKey,
+      revocationPolicy,
+      Local.testAccounts[2]
+    );
   })
-
-  async function localDeploy() {
-    const tx = await Mina.transaction(deployerAccount, () => {
-      issuer.initialise(revocationPolicy)
-      issuer.deploy();
-    });
-    await tx.prove();
-    await tx.sign([deployerKey, issuerKey]).send();
-  }
 
   describe('SoulboundToken', () => {
     it('generates and deploys the SoulboundToken contract', async () => {
-      await localDeploy();
+      await driver.deploy();
     });
 
     it('issues a token', async () => {
-      await localDeploy();
+      await driver.deploy();
 
-      const tx = await Mina.transaction(holderAccount, () => {
         const metadata = new SoulboundMetadata({
           holderKey: holderAccount,
           issuedBetween: [UInt32.from(0), UInt32.from(1000)],
@@ -61,12 +60,7 @@ describe('SoulboundToken', () => {
           attributes: [Field(0)]
         });
         const signature = Signature.create(holderKey, SoulboundMetadata.toFields(metadata));
-        const key = metadata.hash()
-        const witness = tokenMap.getWitness(key)
-        issuer.issue(metadata, signature, witness);
-      });
-      await tx.prove();
-      await tx.sign([holderKey]).send();
+        await driver.issue(metadata, signature);
     });
     it.todo('verifies an issued token');
     it.todo('revokes an issued token');
