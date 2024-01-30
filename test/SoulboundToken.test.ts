@@ -21,7 +21,9 @@ describe('SoulboundToken', () => {
     issuer: SoulboundToken,
     driver: SoulboundTokenDriver,
 
-    tokenMap: MerkleMap;
+    tokenMap: MerkleMap,
+
+    validMetadata: SoulboundMetadata;
 
   beforeAll(async () => {
     if (proofsEnabled) await SoulboundToken.compile();
@@ -43,6 +45,12 @@ describe('SoulboundToken', () => {
       revocationPolicy,
       Local.testAccounts[2]
     );
+    validMetadata = new SoulboundMetadata({
+      holderKey: holderAccount,
+      issuedBetween: [UInt32.from(0), UInt32.from(1000)],
+      revocationPolicy: revocationPolicy,
+      attributes: [Field(0)]
+    });
   })
 
   describe('SoulboundToken', () => {
@@ -50,19 +58,26 @@ describe('SoulboundToken', () => {
       await driver.deploy();
     });
 
+
     it('issues a token', async () => {
       await driver.deploy();
-
-        const metadata = new SoulboundMetadata({
-          holderKey: holderAccount,
-          issuedBetween: [UInt32.from(0), UInt32.from(1000)],
-          revocationPolicy: revocationPolicy,
-          attributes: [Field(0)]
-        });
-        const signature = Signature.create(holderKey, SoulboundMetadata.toFields(metadata));
-        await driver.issue(metadata, signature);
+      const signature = Signature.create(
+        holderKey,
+        SoulboundMetadata.toFields(validMetadata));
+      await driver.issue(validMetadata, signature);
     });
-    it.todo('verifies an issued token');
+    it('verifies an issued token', async () => {
+      await driver.deploy();
+      const signature = Signature.create(
+        holderKey,
+        SoulboundMetadata.toFields(validMetadata));
+      await driver.issue(validMetadata, signature);
+      await driver.verify(validMetadata);
+    });
+    it('fails to validate a nonexistent token',async () => {
+      await driver.deploy();
+      await driver.verify(validMetadata);
+    })
     it.todo('revokes an issued token');
     it.todo('fails to verify a revoked token');
     it.todo('fails to revoke a token that has not been issued');
