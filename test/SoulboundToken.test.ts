@@ -59,7 +59,6 @@ describe('SoulboundToken', () => {
       await driver.deploy();
     });
 
-
     it('issues a token', async () => {
       await driver.deploy();
       const request = 
@@ -88,12 +87,12 @@ describe('SoulboundToken', () => {
 
     // For some reason, this test does not work:
     // The error is thrown, but not caught by `toThrow()`
-    // it('fails to validate a nonexistent token', async () => {
-    //   await driver.deploy();
-    //   await expect(async () => {
-    //     await driver.verify(validMetadata)
-    //   }).rejects.toThrow()
-    // })
+    it('fails to validate a nonexistent token', async () => {
+      await driver.deploy();
+      await expect(async () => {
+        await driver.verify(validMetadata)
+      }).rejects.toThrow(SoulboundErrors.invalidToken)
+    })
     it('revokes an issued token', async () => {
       await driver.deploy();
       const issueRequest = new SoulboundRequest({
@@ -112,8 +111,37 @@ describe('SoulboundToken', () => {
       });
       await driver.revoke(revokeRequest);
     });
-    it.todo('fails to verify a revoked token');
-    it.todo('fails to revoke a token that has not been issued');
+    it('fails to verify a revoked token', async () => {
+      await driver.deploy();
+      const issueRequest = new SoulboundRequest({
+        metadata: validMetadata,
+        type: SoulboundRequest.types.issueToken
+      });
+      const issueSignature = Signature.create(
+        holderKey,
+        SoulboundRequest.toFields(issueRequest)
+      );
+      await driver.issue(issueRequest, issueSignature);
+
+      const revokeRequest = new SoulboundRequest({
+        metadata: validMetadata,
+        type: SoulboundRequest.types.revokeToken
+      });
+      await driver.revoke(revokeRequest);
+      await expect(async () => {
+        await driver.verify(validMetadata)
+      }).rejects.toThrow(SoulboundErrors.invalidToken)
+    });
+    it('fails to revoke a token that has not been issued', async () => {
+      await driver.deploy();
+      const revokeRequest = new SoulboundRequest({
+        metadata: validMetadata,
+        type: SoulboundRequest.types.revokeToken
+      });
+      await expect(async () => {
+        await driver.revoke(revokeRequest)
+      }).rejects.toThrow(SoulboundErrors.invalidToken);
+    });
 
   });
 });
