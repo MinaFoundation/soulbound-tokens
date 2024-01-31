@@ -94,7 +94,24 @@ describe('SoulboundToken', () => {
     //     await driver.verify(validMetadata)
     //   }).rejects.toThrow()
     // })
-    it.todo('revokes an issued token');
+    it('revokes an issued token', async () => {
+      await driver.deploy();
+      const issueRequest = new SoulboundRequest({
+        metadata: validMetadata,
+        type: SoulboundRequest.types.issueToken
+      });
+      const issueSignature = Signature.create(
+        holderKey,
+        SoulboundRequest.toFields(issueRequest)
+      );
+      await driver.issue(issueRequest, issueSignature);
+
+      const revokeRequest = new SoulboundRequest({
+        metadata: validMetadata,
+        type: SoulboundRequest.types.revokeToken
+      });
+      await driver.revoke(revokeRequest);
+    });
     it.todo('fails to verify a revoked token');
     it.todo('fails to revoke a token that has not been issued');
 

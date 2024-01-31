@@ -61,11 +61,11 @@ class SoulboundToken
      * @param signature: A signature for the metadata, from the future token holder
      * 
      */
-    @method public async issue(
+    @method public issue(
         request: SoulboundRequest,
         signature: Signature,
         witness: MerkleMapWitness
-        ): Promise<void> {
+        ) {
         this.root.requireEquals(this.root.get());
         this.revocationPolicy.requireEquals(this.revocationPolicy.get());
 
@@ -107,15 +107,15 @@ class SoulboundToken
      *
      * This does not yet check the `RevocationPolicy` of the token.
      */
-    @method public async revoke(
+    @method public revoke(
         request: SoulboundRequest,
         witness: MerkleMapWitness
-        ): Promise<void> {
+        ) {
         this.root.requireEquals(this.root.get());
         this.revocationPolicy.requireEquals(this.revocationPolicy.get());
 
         // check that the token is issued and has not yet been revoked
-        this.verify(request.metadata, witness);
+        this.verifyAgainstRoot(this.root.get(), request.metadata, witness);
 
         // TODO: check revocation policy
 
@@ -125,16 +125,19 @@ class SoulboundToken
     }
 
     /** Verify that a token exists and is not revoked */
-    @method public async verify(metadata: SoulboundMetadata,
+    @method public verify(metadata: SoulboundMetadata,
         witness: MerkleMapWitness
-        ): Promise<void> {
+        ) {
         //note: we could require a signature from the owner,
         // if we do not want anyone to be able to validate
         this.root.requireEquals(this.root.get());
+        this.verifyAgainstRoot(this.root.get(), metadata, witness)
+    }
 
+    verifyAgainstRoot(expextedRoot: Field, metadata: SoulboundMetadata, witness: MerkleMapWitness) {
         const expectedKey = metadata.hash();
         const [root, key] = witness.computeRootAndKey(TokenState.types.issued)
-        root.assertEquals(this.root.get(), SoulboundErrors.invalidToken);
+        expextedRoot.assertEquals(root, SoulboundErrors.invalidToken);
         expectedKey.assertEquals(key, SoulboundErrors.invalidToken);
     }
 }

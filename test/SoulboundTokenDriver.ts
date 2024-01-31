@@ -46,7 +46,19 @@ class SoulboundTokenDriver{
         this.tokenMap.set(key, TokenState.types.issued);
     }
 
-    public async verify(metadata: SoulboundMetadata) {
+    public async revoke(request: SoulboundRequest) {
+        const key = request.metadata.hash();
+        const witness = this.tokenMap.getWitness(key);
+        const tx = await Mina.transaction(this.feePayerAccount.publicKey, () => {
+            this.issuer.revoke(request, witness);
+        });
+        await tx.prove();
+        await tx.sign([this.feePayerAccount.privateKey]).send();
+        // Update the off-chain map as well
+        this.tokenMap.set(key, TokenState.types.revoked);
+    }
+
+    public async verify(metadata: SoulboundMetadata): Promise<void> {
         const key = metadata.hash();
         const tx = await Mina.transaction(this.feePayerAccount.publicKey, () => {
             const witness = this.tokenMap.getWitness(key);
