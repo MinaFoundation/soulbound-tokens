@@ -1,7 +1,7 @@
 import { Field, MerkleMap, Mina, PrivateKey, PublicKey, Signature, UInt32 } from "o1js";
 import { SoulboundToken } from "../src/SoulboundToken";
 import { RevocationPolicy } from "../src/RevocationPolicy";
-import { SoulboundMetadata } from "../src/SoulboundMetadata";
+import { SoulboundMetadata, SoulboundRequest } from "../src/SoulboundMetadata";
 import { SoulboundTokenDriver } from "./SoulboundTokenDriver";
 import { SoulboundErrors } from "../src/SoulboundErrors";
 
@@ -62,17 +62,27 @@ describe('SoulboundToken', () => {
 
     it('issues a token', async () => {
       await driver.deploy();
+      const request = 
+        new SoulboundRequest({
+          metadata: validMetadata,
+          type: SoulboundRequest.types.issueToken})
       const signature = Signature.create(
         holderKey,
-        SoulboundMetadata.toFields(validMetadata));
-      await driver.issue(validMetadata, signature);
+        SoulboundRequest.toFields(request)
+        );
+      await driver.issue(request, signature);
     });
     it('verifies an issued token', async () => {
       await driver.deploy();
+      const request = 
+        new SoulboundRequest({
+          metadata: validMetadata,
+          type: SoulboundRequest.types.issueToken})
       const signature = Signature.create(
         holderKey,
-        SoulboundMetadata.toFields(validMetadata));
-      await driver.issue(validMetadata, signature);
+        SoulboundRequest.toFields(request)
+        );
+      await driver.issue(request, signature);
       await driver.verify(validMetadata);
     });
 

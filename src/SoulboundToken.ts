@@ -3,7 +3,7 @@ import {
     SmartContract, state, State, method, Signature, Struct, MerkleMap, Bool, MerkleMapWitness,
 } from 'o1js';
 import { RevocationPolicy } from './RevocationPolicy';
-import { SoulboundMetadata } from './SoulboundMetadata';
+import { SoulboundMetadata, SoulboundRequest } from './SoulboundMetadata';
 import { SoulboundErrors } from './SoulboundErrors';
 
 class TokenState extends Struct({
@@ -61,27 +61,36 @@ class SoulboundToken
      * @param signature: A signature for the metadata, from the future token holder
      * 
      */
-    @method public async issue(metadata: SoulboundMetadata, signature: Signature, witness: MerkleMapWitness): Promise<void> {
+    @method public async issue(
+        request: SoulboundRequest,
+        signature: Signature,
+        witness: MerkleMapWitness
+        ): Promise<void> {
         this.root.requireEquals(this.root.get());
         this.revocationPolicy.requireEquals(this.revocationPolicy.get());
 
         // Check that we are in the time window that the token
         // can be issued
-        const [lower, upper] = metadata.issuedBetween;
+        const [lower, upper] = request.metadata.issuedBetween;
         this.currentSlot.requireBetween(lower, upper);
 
         // Check that the `RevocationPolicy` has the right value
-        metadata.revocationPolicy.type
+        request.metadata.revocationPolicy.type
           .assertEquals(
             this.revocationPolicy.get().type,
             SoulboundErrors.wrongPolicy
             );
 
+        // Check that the signed message requests issuing a token
+        // This prevents a "replay" attack where the message and
+        // signature used to issue a token could be used to revoke it
+        request.type.assertEquals(SoulboundRequest.types.issueToken);
+
         // Check signature of holder
-        signature.verify(metadata.holderKey, SoulboundMetadata.toFields(metadata)).assertEquals(Bool(true));
+        signature.verify(request.metadata.holderKey, SoulboundRequest.toFields(request)).assertEquals(Bool(true));
 
         // Check that the token has not been issued before
-        const expextedKey = metadata.hash();
+        const expextedKey = request.metadata.hash();
         const [root, key ] = witness.computeRootAndKey(TokenState.types.nonexistent);
         root.assertEquals(this.root.get());
         key.assertEquals(expextedKey);
@@ -98,12 +107,15 @@ class SoulboundToken
      *
      * This does not yet check the `RevocationPolicy` of the token.
      */
-    @method public async revoke(metadata: SoulboundMetadata, witness: MerkleMapWitness): Promise<void> {
+    @method public async revoke(
+        request: SoulboundRequest,
+        witness: MerkleMapWitness
+        ): Promise<void> {
         this.root.requireEquals(this.root.get());
         this.revocationPolicy.requireEquals(this.revocationPolicy.get());
 
         // check that the token is issued and has not yet been revoked
-        this.verify(metadata, witness);
+        this.verify(request.metadata, witness);
 
         // TODO: check revocation policy
 
@@ -113,7 +125,9 @@ class SoulboundToken
     }
 
     /** Verify that a token exists and is not revoked */
-    @method public async verify(metadata: SoulboundMetadata, witness: MerkleMapWitness): Promise<void> {
+    @method public async verify(metadata: SoulboundMetadata,
+        witness: MerkleMapWitness
+        ): Promise<void> {
         //note: we could require a signature from the owner,
         // if we do not want anyone to be able to validate
         this.root.requireEquals(this.root.get());
