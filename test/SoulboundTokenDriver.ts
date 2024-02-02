@@ -2,6 +2,7 @@ import { Account, MerkleMap, Mina, PrivateKey, PublicKey, Signature } from "o1js
 import { SoulboundMetadata , SoulboundRequest } from "../src/SoulboundMetadata";
 import { SoulboundToken, TokenState } from "../src/SoulboundToken";
 import { RevocationPolicy } from "../src";
+import { SoulboundErrors } from "../src/SoulboundErrors";
 
 type Account = {publicKey: PublicKey; privateKey: PrivateKey;}
 
@@ -27,11 +28,15 @@ class SoulboundTokenDriver{
 
     public async deploy() {
         const tx = await Mina.transaction(this.feePayerAccount.publicKey, () => {
-          this.issuer.initialise(this.revocationPolicy)
           this.issuer.deploy();
         });
         await tx.prove();
         await tx.sign([this.feePayerAccount.privateKey, this.issuerKey]).send();
+        const tx2 = await Mina.transaction(this.feePayerAccount.publicKey, () => {
+            this.issuer.initialise(this.revocationPolicy, this.issuerKey.toPublicKey())
+        });
+        await tx2.prove();
+        await tx2.sign([this.feePayerAccount.privateKey, this.issuerKey]).send();
       }
 
     public async issue(request: SoulboundRequest, signature: Signature) {
@@ -46,12 +51,46 @@ class SoulboundTokenDriver{
         this.tokenMap.set(key, TokenState.types.issued);
     }
 
-    public async revoke(request: SoulboundRequest) {
+    public async revoke(request: SoulboundRequest, holderSignature?: Signature) {
         const key = request.metadata.hash();
         const witness = this.tokenMap.getWitness(key);
-        const tx = await Mina.transaction(this.feePayerAccount.publicKey, () => {
-            this.issuer.revoke(request, witness);
-        });
+        let tx: Mina.Transaction;
+        switch (request.metadata.revocationPolicy.type) {
+            case RevocationPolicy.types.holderOnly:
+                if (typeof holderSignature !== undefined) {
+                    tx = await Mina.transaction(this.feePayerAccount.publicKey, () => {
+                        this.issuer.revokeHolder(request, witness, holderSignature!);
+                    })
+                } else { throw(SoulboundErrors.missingHolderSignature) }
+                break;
+            case RevocationPolicy.types.issuerOnly:
+                // In a real world application, here would be some business logic
+                // to determine if the revocation should be permitted
+                const issuerSignature = Signature.create(
+                    this.issuerKey,
+                    SoulboundRequest.toFields(request));
+                tx = await Mina.transaction(this.feePayerAccount.publicKey, () => {
+                    this.issuer.revokeIssuer(request, witness, issuerSignature);
+                })
+                break;
+            case RevocationPolicy.types.both:
+                // Again, insert a check whether the issuer wants to agree to
+                // the token being revoked
+                if (typeof holderSignature !== undefined) {
+                    const issuerSignature = Signature.create(
+                        this.issuerKey,
+                        SoulboundRequest.toFields(request));
+                    tx = await Mina.transaction(this.feePayerAccount.publicKey, () => {
+                        this.issuer.revokeBoth(request, witness, holderSignature!, issuerSignature);
+                    })
+                } else { throw(SoulboundErrors.missingHolderSignature) }
+                    break;
+            case RevocationPolicy.types.neither:
+                throw(SoulboundErrors.unrevocable);
+            default:
+                throw('unexpected value for revocationPolicy')
+            break;
+        }
         await tx.prove();
         await tx.sign([this.feePayerAccount.privateKey]).send();
         // Update the off-chain map as well

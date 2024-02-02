@@ -1,6 +1,6 @@
 import {
     Field,
-    SmartContract, state, State, method, Signature, Struct, MerkleMap, Bool, MerkleMapWitness,
+    SmartContract, state, State, method, Signature, Struct, MerkleMap, Bool, MerkleMapWitness, PublicKey,
 } from 'o1js';
 import { RevocationPolicy } from './RevocationPolicy';
 import { SoulboundMetadata, SoulboundRequest } from './SoulboundMetadata';
@@ -44,6 +44,7 @@ class SoulboundToken
     // In this example, all tokens from this contract can be
     // revoked according to the same policy
     @state(RevocationPolicy) revocationPolicy = State<RevocationPolicy>();
+    @state(PublicKey) issuerKey = State<PublicKey>();
 
     @method init(): void {
         super.init();
@@ -51,8 +52,9 @@ class SoulboundToken
         this.root.set(emptyMap.getRoot());
     }
 
-    public initialise(revocationPolicy: RevocationPolicy): void {
+    @method initialise(revocationPolicy: RevocationPolicy, issuerKey: PublicKey): void {
         this.revocationPolicy.set(revocationPolicy);
+        this.issuerKey.set(issuerKey);
     }
 
     /** Issue a token
@@ -103,36 +105,15 @@ class SoulboundToken
         this.root.set(newRoot);
     }
 
-    /** Revoke an existing token
-     *
-     * This does not yet check the `RevocationPolicy` of the token.
-     */
-    @method public revoke(
-        request: SoulboundRequest,
-        witness: MerkleMapWitness
-        ) {
-        this.root.requireEquals(this.root.get());
-        this.revocationPolicy.requireEquals(this.revocationPolicy.get());
-
-        // check that the token is issued and has not yet been revoked
-        this.verifyAgainstRoot(this.root.get(), request.metadata, witness);
-
-        // TODO: check revocation policy
-
-        // update the merkle root to have the token revoked
-        const [root, _] = witness.computeRootAndKey(TokenState.types.revoked);
-        this.root.set(root);
-    }
-
     /** Verify that a token exists and is not revoked */
     @method public verify(metadata: SoulboundMetadata,
         witness: MerkleMapWitness
         ) {
-        //note: we could require a signature from the owner,
-        // if we do not want anyone to be able to validate
-        this.root.requireEquals(this.root.get());
-        this.verifyAgainstRoot(this.root.get(), metadata, witness)
-    }
+            //note: we could require a signature from the owner,
+            // if we do not want anyone to be able to validate
+            this.root.requireEquals(this.root.get());
+            this.verifyAgainstRoot(this.root.get(), metadata, witness)
+        }
 
     verifyAgainstRoot(expextedRoot: Field, metadata: SoulboundMetadata, witness: MerkleMapWitness) {
         const expectedKey = metadata.hash();
@@ -140,6 +121,66 @@ class SoulboundToken
         expextedRoot.assertEquals(root, SoulboundErrors.invalidToken);
         expectedKey.assertEquals(key, SoulboundErrors.invalidToken);
     }
+
+    @method public revokeHolder(
+        request: SoulboundRequest,
+        witness: MerkleMapWitness,
+        holderSignature: Signature
+        ) {
+            request.metadata.revocationPolicy.type.assertEquals(
+                RevocationPolicy.types.holderOnly
+            );
+            holderSignature.verify(
+                request.metadata.holderKey,
+                SoulboundRequest.toFields(request)
+            );
+            this.internalRevoke(request.metadata, witness);
+        }
+    @method revokeIssuer(
+        request: SoulboundRequest,
+        witness: MerkleMapWitness,
+        issuerSignature: Signature
+        ) {
+            request.metadata.revocationPolicy.type.assertEquals(
+                RevocationPolicy.types.issuerOnly
+            );
+            issuerSignature.verify(
+                this.issuerKey.getAndRequireEquals(),
+                SoulboundRequest.toFields(request)
+            );
+            this.internalRevoke(request.metadata, witness);
+        }
+    @method revokeBoth(
+        request: SoulboundRequest,
+        witness: MerkleMapWitness,
+        holderSignature: Signature,
+        issuerSignature: Signature
+        ) {
+            request.metadata.revocationPolicy.type.assertEquals(
+                RevocationPolicy.types.both
+            );
+            holderSignature.verify(
+                request.metadata.holderKey,
+                SoulboundRequest.toFields(request)
+            );
+            issuerSignature.verify(
+                this.issuerKey.getAndRequireEquals(),
+                SoulboundRequest.toFields(request)
+            );
+            this.internalRevoke(request.metadata, witness);
+        }
+    private internalRevoke(
+        metadata: SoulboundMetadata,
+        witness: MerkleMapWitness
+        ) {
+            const currentRoot = this.root.getAndRequireEquals();
+            metadata.revocationPolicy.type.assertEquals(
+                this.revocationPolicy.getAndRequireEquals().type
+            );
+            this.verifyAgainstRoot(currentRoot, metadata, witness);
+            const [newRoot, _] = witness.computeRootAndKey(TokenState.types.revoked);
+            this.root.set(newRoot);
+        }
 }
 
 export { SoulboundToken, TokenState };

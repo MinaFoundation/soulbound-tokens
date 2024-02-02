@@ -9,7 +9,7 @@ const accountCreationFee = 0;
 const proofsEnabled = false;
 const enforceTransactionLimits = false;
 
-const revocationPolicy = new RevocationPolicy({type: RevocationPolicy.types.issuerOnly});
+const revocationPolicy = new RevocationPolicy({type: RevocationPolicy.types.both});
 
 describe('SoulboundToken', () => {
 
@@ -109,7 +109,10 @@ describe('SoulboundToken', () => {
         metadata: validMetadata,
         type: SoulboundRequest.types.revokeToken
       });
-      await driver.revoke(revokeRequest);
+      const revokeSignature = Signature.create(
+        holderKey, SoulboundRequest.toFields(revokeRequest)
+      );
+      await driver.revoke(revokeRequest, revokeSignature);
     });
     it('fails to verify a revoked token', async () => {
       await driver.deploy();
@@ -127,7 +130,10 @@ describe('SoulboundToken', () => {
         metadata: validMetadata,
         type: SoulboundRequest.types.revokeToken
       });
-      await driver.revoke(revokeRequest);
+      const revokeSignature = Signature.create(
+        holderKey, SoulboundRequest.toFields(revokeRequest)
+      );
+      await driver.revoke(revokeRequest, revokeSignature);
       await expect(async () => {
         await driver.verify(validMetadata)
       }).rejects.toThrow(SoulboundErrors.invalidToken)
@@ -139,8 +145,11 @@ describe('SoulboundToken', () => {
         type: SoulboundRequest.types.revokeToken
       });
       await expect(async () => {
-        await driver.revoke(revokeRequest)
-      }).rejects.toThrow(SoulboundErrors.invalidToken);
+        const revokeSignature = Signature.create(
+          holderKey, SoulboundRequest.toFields(revokeRequest)
+        );
+        await driver.revoke(revokeRequest, revokeSignature);
+        }).rejects.toThrow(SoulboundErrors.invalidToken);
     });
 
   });
