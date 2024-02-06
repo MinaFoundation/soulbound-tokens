@@ -39,6 +39,9 @@ class TokenState extends Struct({
 */
 class SoulboundToken
  extends SmartContract {
+    events = {
+        'update-merkle-root': Field,
+      };
     // Root of the `MerkleMap` that contains all the tokens
     @state(Field) root = State<Field>();
     // In this example, all tokens from this contract can be
@@ -49,7 +52,7 @@ class SoulboundToken
     @method init(): void {
         super.init();
         const emptyMap = new MerkleMap;
-        this.root.set(emptyMap.getRoot());
+        this.updateRoot(emptyMap.getRoot());
     }
 
     @method initialise(revocationPolicy: RevocationPolicy, issuerKey: PublicKey): void {
@@ -102,7 +105,7 @@ class SoulboundToken
 
         // Update the on-chain root
         const [newRoot, _] = witness.computeRootAndKey(TokenState.types.issued);
-        this.root.set(newRoot);
+        this.updateRoot(newRoot);
     }
 
     /** Verify that a token exists and is not revoked */
@@ -179,8 +182,13 @@ class SoulboundToken
             );
             this.verifyAgainstRoot(currentRoot, metadata, witness);
             const [newRoot, _] = witness.computeRootAndKey(TokenState.types.revoked);
-            this.root.set(newRoot);
+            this.updateRoot(newRoot);
         }
+
+    private updateRoot(root: Field) {
+        this.root.set(root);
+        this.emitEvent('update-merkle-root', root);
+    }
 }
 
 export { SoulboundToken, TokenState };

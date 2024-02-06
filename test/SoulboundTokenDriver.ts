@@ -1,4 +1,4 @@
-import { Account, MerkleMap, Mina, PrivateKey, PublicKey, Signature } from "o1js";
+import { Account, Field, MerkleMap, MerkleMapWitness, Mina, PrivateKey, PublicKey, Signature } from "o1js";
 import { SoulboundMetadata , SoulboundRequest } from "../src/SoulboundMetadata";
 import { SoulboundToken, TokenState } from "../src/SoulboundToken";
 import { RevocationPolicy } from "../src";
@@ -89,7 +89,6 @@ class SoulboundTokenDriver{
                 throw(SoulboundErrors.unrevocable);
             default:
                 throw('unexpected value for revocationPolicy')
-            break;
         }
         await tx.prove();
         await tx.sign([this.feePayerAccount.privateKey]).send();
@@ -97,14 +96,19 @@ class SoulboundTokenDriver{
         this.tokenMap.set(key, TokenState.types.revoked);
     }
 
-    public async verify(metadata: SoulboundMetadata): Promise<void> {
-        const key = metadata.hash();
+    public async verify(metadata: SoulboundMetadata): Promise<MerkleMapWitness> {
+        const {witness} = this.getWitness(metadata);
         const tx = await Mina.transaction(this.feePayerAccount.publicKey, () => {
-            const witness = this.tokenMap.getWitness(key);
             this.issuer.verify(metadata, witness);
         })
         await tx.prove();
         await tx.sign([this.feePayerAccount.privateKey]).send();
+        return(witness);
+    }
+
+    public getWitness(metadata: SoulboundMetadata): {root: Field, witness: MerkleMapWitness} {
+        const key = metadata.hash();
+        return({root: key, witness: this.tokenMap.getWitness(key)});
     }
 }
 
