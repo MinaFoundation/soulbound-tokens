@@ -43,21 +43,32 @@ class SoulboundToken
         'update-merkle-root': Field,
       };
     // Root of the `MerkleMap` that contains all the tokens
-    @state(Field) root = State<Field>();
+    @state(Field) public readonly root = State<Field>();
     // In this example, all tokens from this contract can be
     // revoked according to the same policy
-    @state(RevocationPolicy) revocationPolicy = State<RevocationPolicy>();
-    @state(PublicKey) issuerKey = State<PublicKey>();
+    @state(RevocationPolicy) public readonly revocationPolicy = State<RevocationPolicy>();
+    @state(PublicKey) public readonly issuerKey = State<PublicKey>();
+    @state(Bool) public readonly initialised = State<Bool>()
 
     @method init(): void {
         super.init();
         const emptyMap = new MerkleMap;
         this.updateRoot(emptyMap.getRoot());
+        this.initialised.set(Bool(false));
     }
 
     @method initialise(revocationPolicy: RevocationPolicy, issuerKey: PublicKey): void {
+        // this check prevents anyone from overwriting the state
+        // by calling initialise again
+        // Note that in production, you would want to ensure that only
+        // the creator of the token can call initialise in the first place.
+        // One way of doing that is by hard-coding an initial public key into
+        // the code of the contract.
+        this.initialised.requireEquals(this.initialised.get());
+        this.initialised.get().assertFalse();
         this.revocationPolicy.set(revocationPolicy);
         this.issuerKey.set(issuerKey);
+        this.initialised.set(Bool(true));
     }
 
     /** Issue a token

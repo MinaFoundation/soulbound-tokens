@@ -1,4 +1,4 @@
-import { Account, Field, MerkleMap, MerkleMapWitness, Mina, PrivateKey, PublicKey, Signature } from "o1js";
+import { Account, Bool, Field, MerkleMap, MerkleMapWitness, Mina, PrivateKey, PublicKey, Signature } from "o1js";
 import { SoulboundMetadata , SoulboundRequest } from "../src/SoulboundMetadata";
 import { SoulboundToken, TokenState } from "../src/SoulboundToken";
 import { RevocationPolicy } from "../src";
@@ -37,7 +37,7 @@ class SoulboundTokenDriver{
         });
         await tx2.prove();
         await tx2.sign([this.feePayerAccount.privateKey, this.issuerKey]).send();
-      }
+    }
 
     public async issue(request: SoulboundRequest, signature: Signature) {
         const key = request.metadata.hash();
