@@ -1,11 +1,11 @@
 import { Field, PublicKey, Poseidon, UInt32, Struct } from 'o1js';
-import { RevocationPolicy } from './RevocationPolicy';
+import { BurnAuth } from './BurnAuth';
 
 /** Metadata that defines a token */
 class SoulboundMetadata extends Struct({
-    holderKey: PublicKey,
+    ownerKey: PublicKey,
     issuedBetween: [UInt32, UInt32],
-    revocationPolicy: RevocationPolicy,
+    burnAuth: BurnAuth,
     attributes: [Field],
 }) {
     hash(): Field {
