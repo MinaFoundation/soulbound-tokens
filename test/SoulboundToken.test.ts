@@ -1,6 +1,6 @@
 import { Field, MerkleMap, Mina, PrivateKey, PublicKey, Signature, UInt32 } from "o1js";
 import { SoulboundToken } from "../src/SoulboundToken";
-import { RevocationPolicy } from "../src/RevocationPolicy";
+import { BurnAuth } from "../src/BurnAuth";
 import { SoulboundMetadata, SoulboundRequest } from "../src/SoulboundMetadata";
 import { SoulboundTokenDriver } from "./SoulboundTokenDriver";
 import { SoulboundErrors } from "../src/SoulboundErrors";
@@ -9,14 +9,14 @@ const accountCreationFee = 0;
 const proofsEnabled = false;
 const enforceTransactionLimits = false;
 
-const revocationPolicy = new RevocationPolicy({type: RevocationPolicy.types.both});
+const burnAuth = new BurnAuth({type: BurnAuth.types.both});
 
 describe('SoulboundToken', () => {
 
   let deployerAccount: PublicKey,
     deployerKey: PrivateKey,
-    holderAccount: PublicKey,
-    holderKey: PrivateKey,
+    ownerAccount: PublicKey,
+    ownerKey: PrivateKey,
     issuerAddress: PublicKey,
     issuerKey: PrivateKey,
     issuer: SoulboundToken,
@@ -34,7 +34,7 @@ describe('SoulboundToken', () => {
     const Local = Mina.LocalBlockchain({ accountCreationFee, proofsEnabled, enforceTransactionLimits});
     Mina.setActiveInstance(Local);
     ({ privateKey: deployerKey, publicKey: deployerAccount} = Local.testAccounts[0]);
-    ({ privateKey: holderKey, publicKey: holderAccount} = Local.testAccounts[1]);
+    ({ privateKey: ownerKey, publicKey: ownerAccount} = Local.testAccounts[1]);
     issuerKey = PrivateKey.random();
     issuerAddress = issuerKey.toPublicKey();
     issuer = new SoulboundToken(issuerAddress);
@@ -43,13 +43,13 @@ describe('SoulboundToken', () => {
       tokenMap,
       issuer,
       issuerKey,
-      revocationPolicy,
+      burnAuth,
       Local.testAccounts[2]
     );
     validMetadata = new SoulboundMetadata({
-      holderKey: holderAccount,
+      ownerKey: ownerAccount,
       issuedBetween: [UInt32.from(0), UInt32.from(1000)],
-      revocationPolicy: revocationPolicy,
+      burnAuth: burnAuth,
       attributes: [Field(0)]
     });
   })
@@ -66,7 +66,7 @@ describe('SoulboundToken', () => {
           metadata: validMetadata,
           type: SoulboundRequest.types.issueToken})
       const signature = Signature.create(
-        holderKey,
+        ownerKey,
         SoulboundRequest.toFields(request)
         );
       await driver.issue(request, signature);
@@ -78,7 +78,7 @@ describe('SoulboundToken', () => {
           metadata: validMetadata,
           type: SoulboundRequest.types.issueToken})
       const signature = Signature.create(
-        holderKey,
+        ownerKey,
         SoulboundRequest.toFields(request)
         );
       await driver.issue(request, signature);
@@ -100,7 +100,7 @@ describe('SoulboundToken', () => {
         type: SoulboundRequest.types.issueToken
       });
       const issueSignature = Signature.create(
-        holderKey,
+        ownerKey,
         SoulboundRequest.toFields(issueRequest)
       );
       await driver.issue(issueRequest, issueSignature);
@@ -110,7 +110,7 @@ describe('SoulboundToken', () => {
         type: SoulboundRequest.types.revokeToken
       });
       const revokeSignature = Signature.create(
-        holderKey, SoulboundRequest.toFields(revokeRequest)
+        ownerKey, SoulboundRequest.toFields(revokeRequest)
       );
       await driver.revoke(revokeRequest, revokeSignature);
     });
@@ -121,7 +121,7 @@ describe('SoulboundToken', () => {
         type: SoulboundRequest.types.issueToken
       });
       const issueSignature = Signature.create(
-        holderKey,
+        ownerKey,
         SoulboundRequest.toFields(issueRequest)
       );
       await driver.issue(issueRequest, issueSignature);
@@ -131,7 +131,7 @@ describe('SoulboundToken', () => {
         type: SoulboundRequest.types.revokeToken
       });
       const revokeSignature = Signature.create(
-        holderKey, SoulboundRequest.toFields(revokeRequest)
+        ownerKey, SoulboundRequest.toFields(revokeRequest)
       );
       await driver.revoke(revokeRequest, revokeSignature);
       await expect(async () => {
@@ -146,7 +146,7 @@ describe('SoulboundToken', () => {
       });
       await expect(async () => {
         const revokeSignature = Signature.create(
-          holderKey, SoulboundRequest.toFields(revokeRequest)
+          ownerKey, SoulboundRequest.toFields(revokeRequest)
         );
         await driver.revoke(revokeRequest, revokeSignature);
         }).rejects.toThrow(SoulboundErrors.invalidToken);

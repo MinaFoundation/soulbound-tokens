@@ -2,7 +2,7 @@ import {
     Field,
     SmartContract, state, State, method, Signature, Struct, MerkleMap, Bool, MerkleMapWitness, PublicKey,
 } from 'o1js';
-import { RevocationPolicy } from './RevocationPolicy';
+import { BurnAuth } from './BurnAuth';
 import { SoulboundMetadata, SoulboundRequest } from './SoulboundMetadata';
 import { SoulboundErrors } from './SoulboundErrors';
 
@@ -46,7 +46,7 @@ class SoulboundToken
     @state(Field) public readonly root = State<Field>();
     // In this example, all tokens from this contract can be
     // revoked according to the same policy
-    @state(RevocationPolicy) public readonly revocationPolicy = State<RevocationPolicy>();
+    @state(BurnAuth) public readonly burnAuth = State<BurnAuth>();
     @state(PublicKey) public readonly issuerKey = State<PublicKey>();
     @state(Bool) public readonly initialised = State<Bool>()
 
@@ -57,7 +57,7 @@ class SoulboundToken
         this.initialised.set(Bool(false));
     }
 
-    @method initialise(revocationPolicy: RevocationPolicy, issuerKey: PublicKey): void {
+    @method initialise(burnAuth: BurnAuth, issuerKey: PublicKey): void {
         // this check prevents anyone from overwriting the state
         // by calling initialise again
         // Note that in production, you would want to ensure that only
@@ -66,7 +66,7 @@ class SoulboundToken
         // the code of the contract.
         this.initialised.requireEquals(this.initialised.get());
         this.initialised.get().assertFalse();
-        this.revocationPolicy.set(revocationPolicy);
+        this.burnAuth.set(burnAuth);
         this.issuerKey.set(issuerKey);
         this.initialised.set(Bool(true));
     }
@@ -74,7 +74,7 @@ class SoulboundToken
     /** Issue a token
      *
      * @argument metadata: The @link SoulboundMetadata of the token to be issued
-     * @param signature: A signature for the metadata, from the future token holder
+     * @param signature: A signature for the metadata, from the future token owner
      * 
      */
     @method public issue(
@@ -83,17 +83,17 @@ class SoulboundToken
         witness: MerkleMapWitness
         ) {
         this.root.requireEquals(this.root.get());
-        this.revocationPolicy.requireEquals(this.revocationPolicy.get());
+        this.burnAuth.requireEquals(this.burnAuth.get());
 
         // Check that we are in the time window that the token
         // can be issued
         const [lower, upper] = request.metadata.issuedBetween;
         this.currentSlot.requireBetween(lower, upper);
 
-        // Check that the `RevocationPolicy` has the right value
-        request.metadata.revocationPolicy.type
+        // Check that the `BurnAuth` has the right value
+        request.metadata.burnAuth.type
           .assertEquals(
-            this.revocationPolicy.get().type,
+            this.burnAuth.get().type,
             SoulboundErrors.wrongPolicy
             );
 
@@ -102,8 +102,8 @@ class SoulboundToken
         // signature used to issue a token could be used to revoke it
         request.type.assertEquals(SoulboundRequest.types.issueToken);
 
-        // Check signature of holder
-        signature.verify(request.metadata.holderKey, SoulboundRequest.toFields(request)).assertEquals(Bool(true));
+        // Check signature of owner
+        signature.verify(request.metadata.ownerKey, SoulboundRequest.toFields(request)).assertEquals(Bool(true));
 
         // Check that the token has not been issued before
         const expextedKey = request.metadata.hash();
@@ -136,16 +136,16 @@ class SoulboundToken
         expectedKey.assertEquals(key, SoulboundErrors.invalidToken);
     }
 
-    @method public revokeHolder(
+    @method public revokeOwner(
         request: SoulboundRequest,
         witness: MerkleMapWitness,
-        holderSignature: Signature
+        ownerSignature: Signature
         ) {
-            request.metadata.revocationPolicy.type.assertEquals(
-                RevocationPolicy.types.holderOnly
+            request.metadata.burnAuth.type.assertEquals(
+                BurnAuth.types.ownerOnly
             );
-            holderSignature.verify(
-                request.metadata.holderKey,
+            ownerSignature.verify(
+                request.metadata.ownerKey,
                 SoulboundRequest.toFields(request)
             );
             this.internalRevoke(request.metadata, witness);
@@ -155,8 +155,8 @@ class SoulboundToken
         witness: MerkleMapWitness,
         issuerSignature: Signature
         ) {
-            request.metadata.revocationPolicy.type.assertEquals(
-                RevocationPolicy.types.issuerOnly
+            request.metadata.burnAuth.type.assertEquals(
+                BurnAuth.types.issuerOnly
             );
             issuerSignature.verify(
                 this.issuerKey.getAndRequireEquals(),
@@ -167,14 +167,14 @@ class SoulboundToken
     @method revokeBoth(
         request: SoulboundRequest,
         witness: MerkleMapWitness,
-        holderSignature: Signature,
+        ownerSignature: Signature,
         issuerSignature: Signature
         ) {
-            request.metadata.revocationPolicy.type.assertEquals(
-                RevocationPolicy.types.both
+            request.metadata.burnAuth.type.assertEquals(
+                BurnAuth.types.both
             );
-            holderSignature.verify(
-                request.metadata.holderKey,
+            ownerSignature.verify(
+                request.metadata.ownerKey,
                 SoulboundRequest.toFields(request)
             );
             issuerSignature.verify(
@@ -188,8 +188,8 @@ class SoulboundToken
         witness: MerkleMapWitness
         ) {
             const currentRoot = this.root.getAndRequireEquals();
-            metadata.revocationPolicy.type.assertEquals(
-                this.revocationPolicy.getAndRequireEquals().type
+            metadata.burnAuth.type.assertEquals(
+                this.burnAuth.getAndRequireEquals().type
             );
             this.verifyAgainstRoot(currentRoot, metadata, witness);
             const [newRoot, _] = witness.computeRootAndKey(TokenState.types.revoked);
