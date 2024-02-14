@@ -1,4 +1,4 @@
-import { MerkleMapWitness, Signature } from "o1js";
+import { MerkleMapWitness, PublicKey, Signature } from "o1js";
 import { SoulboundMetadata, SoulboundRequest } from "../SoulboundMetadata";
 
 interface SBTService {
@@ -7,4 +7,8 @@ interface SBTService {
     verify(metadata: SoulboundMetadata): Promise<MerkleMapWitness>
 }
 
-export { SBTService }
+interface SBTQuery {
+    getSoulboundToken(owner: PublicKey): SoulboundMetadata | undefined
+}
+
+export { SBTService, SBTQuery }
