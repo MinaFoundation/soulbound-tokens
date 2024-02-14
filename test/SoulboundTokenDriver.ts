@@ -3,10 +3,11 @@ import { SoulboundMetadata , SoulboundRequest } from "../src/SoulboundMetadata";
 import { SoulboundToken, TokenState } from "../src/SoulboundToken";
 import { BurnAuth } from "../src";
 import { SoulboundErrors } from "../src/SoulboundErrors";
+import { SBTService } from "../src/interfaces/SBTService";
 
 type Account = {publicKey: PublicKey; privateKey: PrivateKey;}
 
-class SoulboundTokenDriver{
+class SoulboundTokenDriver implements SBTService {
     tokenMap: MerkleMap;
     issuer: SoulboundToken;
     issuerKey: PrivateKey;
@@ -39,7 +40,7 @@ class SoulboundTokenDriver{
         await tx2.sign([this.feePayerAccount.privateKey, this.issuerKey]).send();
     }
 
-    public async issue(request: SoulboundRequest, signature: Signature) {
+    public async issue(request: SoulboundRequest, signature: Signature): Promise<void> {
         const key = request.metadata.hash();
         const tx = await Mina.transaction(this.feePayerAccount.publicKey, () => {
           const witness = this.tokenMap.getWitness(key);
@@ -51,7 +52,7 @@ class SoulboundTokenDriver{
         this.tokenMap.set(key, TokenState.types.issued);
     }
 
-    public async revoke(request: SoulboundRequest, ownerSignature?: Signature) {
+    public async revoke(request: SoulboundRequest, ownerSignature?: Signature): Promise<void> {
         const key = request.metadata.hash();
         const witness = this.tokenMap.getWitness(key);
         let tx: Mina.Transaction;
